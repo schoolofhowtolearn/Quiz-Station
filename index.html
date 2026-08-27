@@ -1510,7 +1510,6 @@
     });
     document.getElementById('answer-panel').style.display = 'flex';
     document.getElementById('judge-row').style.display = 'none';
-    playSfx('buzz');
     judge(false);
   }
 
@@ -1540,7 +1539,6 @@
     var buttons = document.querySelectorAll('#choice-list .choice-btn');
     if(buttons.length && buttons[0].disabled) return; // already answered
     stopTimer();
-    playSfx('buzz');
     var correctIndex = currentChoiceSet.correctIndex;
     buttons.forEach(function(btn, i){
       btn.disabled = true;
