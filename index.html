@@ -587,6 +587,16 @@
   .count-opt.active{ background:var(--accent); color:#2a1604; border-color:var(--accent); }
   .modal-actions{ display:flex; gap:10px; margin-top:20px; }
   .modal-actions .btn{ width:auto; }
+  .range-inputs{ display:flex; align-items:flex-end; gap:12px; margin-top:16px; }
+  .range-field{ flex:1; display:flex; flex-direction:column; gap:6px; min-width:0; }
+  .range-field label{ font-size:0.72rem; color:var(--ink-muted); }
+  .range-field input[type="number"]{
+    border:1px solid var(--border); background:var(--surface);
+    color:var(--ink); font-family:inherit; font-weight:700; font-size:1rem;
+    padding:10px 12px; border-radius:12px; width:100%; box-sizing:border-box;
+  }
+  .range-sep{ font-weight:700; color:var(--ink-muted); padding-bottom:10px; }
+  .range-error{ font-size:0.78rem; color:var(--stamp-red); margin-top:10px; }
 
   /* ---------- Chapter question list ---------- */
   .qlist-wrap{ display:flex; flex-direction:column; gap:8px; margin-top:10px; }
@@ -758,6 +768,14 @@
           </div>
           <div class="quick-count" id="chapterlist-shuffle-count">0問</div>
         </button>
+        <button class="quick-card" id="btn-chapterlist-sequential">
+          <div class="quick-icon all">📋</div>
+          <div class="quick-text">
+            <div class="quick-title">この章を順番に出題</div>
+            <div class="quick-desc">問題番号を何番から何番まで指定できます</div>
+          </div>
+          <div class="quick-count" id="chapterlist-sequential-count">0問</div>
+        </button>
       </div>
       <div>
         <div class="section-label">問題を選んで解く</div>
@@ -857,6 +875,29 @@
     <div class="modal-actions">
       <button class="btn btn-ghost" id="count-modal-cancel" style="flex:1;">キャンセル</button>
       <button class="btn btn-primary" id="count-modal-start" style="flex:2;">この数で始める</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="range-modal" style="display:none;">
+  <div class="modal-sheet">
+    <div class="modal-title">出題範囲を選ぶ</div>
+    <div class="modal-sub" id="range-modal-sub">問題番号を指定してください</div>
+    <div class="range-inputs">
+      <div class="range-field">
+        <label for="range-from">開始番号</label>
+        <input type="number" id="range-from" min="1" value="1" inputmode="numeric">
+      </div>
+      <div class="range-sep">〜</div>
+      <div class="range-field">
+        <label for="range-to">終了番号</label>
+        <input type="number" id="range-to" min="1" value="1" inputmode="numeric">
+      </div>
+    </div>
+    <div class="range-error" id="range-error" style="display:none;"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="range-modal-cancel" style="flex:1;">キャンセル</button>
+      <button class="btn btn-primary" id="range-modal-start" style="flex:2;">この範囲で始める</button>
     </div>
   </div>
 </div>
@@ -1361,6 +1402,7 @@
     document.getElementById('chapterlist-title').textContent = clist[0].chapter;
     document.getElementById('chapterlist-sub').textContent = answered + ' / ' + clist.length + '問';
     document.getElementById('chapterlist-shuffle-count').textContent = clist.length + '問';
+    document.getElementById('chapterlist-sequential-count').textContent = clist.length + '問';
 
     var wrap = document.getElementById('qlist-wrap');
     wrap.innerHTML = '';
@@ -1392,6 +1434,53 @@
     var clist = byBookChapter[currentBookId][currentChapterKey];
     var label = (CHAPTER_LABEL_PREFIX[currentBookId]||'')+(currentBookId==='todai'?currentChapterKey+'章 ':'')+clist[0].chapter;
     openCountPicker(clist, label, {returnTo:'home'});
+  });
+
+  // ---------- Sequential range picker (this chapter, in order, by question number) ----------
+  var pendingRange = null;
+
+  function openRangePicker(clist){
+    if(!clist.length) return;
+    pendingRange = clist;
+    var total = clist.length;
+    document.getElementById('range-modal-sub').textContent = '全'+total+'問の中から、出題する問題番号の範囲を指定してください（1〜'+total+'）';
+    var fromInput = document.getElementById('range-from');
+    var toInput = document.getElementById('range-to');
+    fromInput.min = 1; fromInput.max = total; fromInput.value = 1;
+    toInput.min = 1; toInput.max = total; toInput.value = total;
+    document.getElementById('range-error').style.display = 'none';
+    document.getElementById('range-modal').style.display = 'flex';
+  }
+
+  function hideRangeModal(){
+    document.getElementById('range-modal').style.display = 'none';
+    pendingRange = null;
+  }
+
+  document.getElementById('btn-chapterlist-sequential').addEventListener('click', function(){
+    var clist = byBookChapter[currentBookId][currentChapterKey];
+    openRangePicker(clist);
+  });
+  document.getElementById('range-modal-cancel').addEventListener('click', hideRangeModal);
+  document.getElementById('range-modal').addEventListener('click', function(e){
+    if(e.target === e.currentTarget) hideRangeModal();
+  });
+  document.getElementById('range-modal-start').addEventListener('click', function(){
+    if(!pendingRange) return;
+    var clist = pendingRange;
+    var total = clist.length;
+    var from = parseInt(document.getElementById('range-from').value, 10);
+    var to = parseInt(document.getElementById('range-to').value, 10);
+    var errEl = document.getElementById('range-error');
+    if(isNaN(from) || isNaN(to) || from < 1 || to > total || from > to){
+      errEl.textContent = '開始番号・終了番号は1〜'+total+'の範囲で、開始番号は終了番号以下にしてください。';
+      errEl.style.display = 'block';
+      return;
+    }
+    var sub = clist.slice(from-1, to);
+    var label = (CHAPTER_LABEL_PREFIX[currentBookId]||'')+(currentBookId==='todai'?currentChapterKey+'章 ':'')+clist[0].chapter+'・'+from+'〜'+to+'問目';
+    hideRangeModal();
+    startSession(sub, label, {returnTo:'home'});
   });
 
   // ---------- Choice generation (for 4-choice mode) ----------
